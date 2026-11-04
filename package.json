@@ -8,6 +8,9 @@
     "start": "tsx src/index.ts",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "ws": "^8.18.3"
+  },
   "devDependencies": {
     "@types/node": "^22.10.2",
     "tsx": "^4.19.2",
