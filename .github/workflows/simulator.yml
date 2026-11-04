@@ -24,3 +24,7 @@ jobs:
 
       - name: Run simulator
         run: npm start
+
+      - name: Test BSC WebSocket listener
+        run: npx tsx src/bsc-listener.ts
+        timeout-minutes: 2
