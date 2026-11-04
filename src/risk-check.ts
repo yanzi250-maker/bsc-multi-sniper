@@ -210,14 +210,14 @@ export async function inspectToken(
     if (implementation && !/^0x0{40}$/.test(implementation)) {
       results.push({
         name: "代理合约",
-        status: "风险信号",
-        detail: `检测到 EIP-1967 实现合约：${implementation}`
+        status: "无法判断",
+        detail: `可能存在可升级代理，实现合约：${implementation}，需要进一步检查`
       });
     } else {
       results.push({
         name: "代理合约",
-        status: "正常信号",
-        detail: "未检测到 EIP-1967 标准实现地址"
+        status: "无法判断",
+        detail: "未检测到 EIP-1967 标准实现地址，但不排除其他代理模式"
       });
     }
   } catch {
