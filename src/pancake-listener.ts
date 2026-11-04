@@ -196,17 +196,23 @@ ws.on("message", (raw) => {
       return;
     }
 
-    if (message.id !== undefined) {
-      const info = pending.get(message.id);
 
-      if (info && message.result) {
-        subscriptions.set(message.result, info);
-        pending.delete(message.id);
-        console.log("流动性订阅成功：", info.pool);
-      } else {
-        console.log("工厂订阅响应：", JSON.stringify(message));
-      }
+    if (info && message.result) {
+  subscriptions.set(message.result, info);
+  pending.delete(message.id);
+  console.log("流动性订阅成功：", info.pool);
+} else {
+  const launchInfo =
+    pendingLaunchSubscriptions.get(message.id);
 
+  if (launchInfo && message.result) {
+    launchSubscriptions.set(message.result, launchInfo);
+    pendingLaunchSubscriptions.delete(message.id);
+    console.log("首次交易订阅成功：", launchInfo.pool);
+  } else {
+    console.log("工厂订阅响应：", JSON.stringify(message));
+  }
+}
       return;
     }
 
