@@ -171,6 +171,7 @@ const createdBlock = parseInt(log.blockNumber, 16);
 );
 }
 
+const processedLiquidityEvents = new Set<string>();
 function handleLiquidity(log: any, info: any) {
   const data = log.data || "0x";
 
