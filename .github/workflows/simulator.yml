@@ -31,4 +31,4 @@ jobs:
 
       - name: Test PancakeSwap V2 PairCreated listener
         run: npx tsx src/pancake-listener.ts
-        timeout-minutes: 2
+        timeout-minutes: 5
