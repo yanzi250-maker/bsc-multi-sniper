@@ -196,33 +196,44 @@ ws.on("message", (raw) => {
       return;
     }
 
+    if (message.id !== undefined && message.result) {
+      const liquidityInfo = pending.get(message.id);
 
-    if (info && message.result) {
-  subscriptions.set(message.result, info);
-  pending.delete(message.id);
-  console.log("流动性订阅成功：", info.pool);
-} else {
-  const launchInfo =
-    pendingLaunchSubscriptions.get(message.id);
+      if (liquidityInfo) {
+        subscriptions.set(message.result, liquidityInfo);
+        pending.delete(message.id);
+        console.log("流动性订阅成功：", liquidityInfo.pool);
+        return;
+      }
 
-  if (launchInfo && message.result) {
-    launchSubscriptions.set(message.result, launchInfo);
-    pendingLaunchSubscriptions.delete(message.id);
-    console.log("首次交易订阅成功：", launchInfo.pool);
-  } else {
-    console.log("工厂订阅响应：", JSON.stringify(message));
-  }
-}
+      const launchInfo =
+        pendingLaunchSubscriptions.get(message.id);
+
+      if (launchInfo) {
+        launchSubscriptions.set(message.result, launchInfo);
+        pendingLaunchSubscriptions.delete(message.id);
+        console.log("首次交易订阅成功：", launchInfo.pool);
+        return;
+      }
+
+      console.log("工厂订阅响应：", JSON.stringify(message));
       return;
     }
 
     const log = message.params?.result;
     if (!log) return;
 
-    const info = subscriptions.get(message.params.subscription);
+    const subscriptionId = message.params.subscription;
 
-    if (info) {
-      handleLiquidity(log, info);
+    const liquidityInfo = subscriptions.get(subscriptionId);
+    if (liquidityInfo) {
+      handleLiquidity(log, liquidityInfo);
+      return;
+    }
+
+    const launchInfo = launchSubscriptions.get(subscriptionId);
+    if (launchInfo) {
+      handleLaunchSwap(log, launchInfo);
       return;
     }
 
