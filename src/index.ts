@@ -1,3 +1,4 @@
+import { CONFIG } from "./config.js";
 
 type SignalType = "NEW_POOL" | "NEW_TOKEN" | "LARGE_BUY";
 
@@ -14,101 +15,139 @@ interface Position {
   symbol: string;
   entryPrice: number;
   quantity: number;
+  investedBnb: number;
 }
 
-const CONFIG = {
-  startingBalance: 10,
-  positionSize: 0.1,
-  minLiquidityBnb: 5,
-  largeBuyThresholdBnb: 3,
-  takeProfitPercent: 20,
-  stopLossPercent: 10,
-  slippagePercent: 1
-};
-
 class Simulator {
-  private balance = CONFIG.startingBalance;
+  private balance = CONFIG.startingBalanceBnb;
   private positions = new Map<string, Position>();
+  private realizedPnl = 0;
 
-  buy(signal: Signal, price: number) {
-    if (this.positions.has(signal.token)) return;
-    if (this.balance < CONFIG.positionSize) return;
+  buy(signal: Signal, price: number): void {
+    if (this.positions.has(signal.token)) {
+      console.log(`[风控] ${signal.symbol} 已持仓，拒绝重复买入`);
+      return;
+    }
 
-    const entryPrice = price * (1 + CONFIG.slippagePercent / 100);
-    const quantity = CONFIG.positionSize / entryPrice;
+    if (this.positions.size >= CONFIG.risk.maxPositions) {
+      console.log("[风控] 已达到最大持仓数量，拒绝买入");
+      return;
+    }
 
-    this.balance -= CONFIG.positionSize;
+    if (this.balance < CONFIG.positionSizeBnb) {
+      console.log("[风控] 虚拟余额不足，拒绝买入");
+      return;
+    }
+
+    const entryPrice =
+      price * (1 + CONFIG.risk.slippagePercent / 100);
+
+    const quantity = CONFIG.positionSizeBnb / entryPrice;
+
+    this.balance -= CONFIG.positionSizeBnb;
 
     this.positions.set(signal.token, {
       token: signal.token,
       symbol: signal.symbol,
       entryPrice,
-      quantity
+      quantity,
+      investedBnb: CONFIG.positionSizeBnb
     });
 
     console.log(
-      `[模拟买入] ${signal.symbol} | 价格 ${entryPrice.toFixed(8)} | 投入 0.1 BNB`
+      `[模拟买入] ${signal.symbol} | 投入 ${CONFIG.positionSizeBnb} BNB | 成交价 ${entryPrice.toFixed(8)}`
     );
   }
 
-  updatePrice(token: string, price: number) {
+  updatePrice(token: string, price: number): void {
     const position = this.positions.get(token);
     if (!position) return;
 
-    const change =
-      ((price - position.entryPrice) / position.entryPrice) * 100;
+    const sellPrice =
+      price * (1 - CONFIG.risk.slippagePercent / 100);
 
-    console.log(`[行情] ${position.symbol} | 盈亏 ${change.toFixed(2)}%`);
+    const proceeds = position.quantity * sellPrice;
 
-    if (
-      change >= CONFIG.takeProfitPercent ||
-      change <= -CONFIG.stopLossPercent
-    ) {
-      this.sell(token, price, change);
+    const pnl = proceeds - position.investedBnb;
+
+    const pnlPercent =
+      (pnl / position.investedBnb) * 100;
+
+    console.log(
+      `[行情] ${position.symbol} | 预计净盈亏 ${pnlPercent.toFixed(2)}%`
+    );
+
+    if (pnlPercent >= CONFIG.risk.takeProfitPercent) {
+      console.log("[风控] 达到止盈条件");
+      this.sell(token, proceeds, pnl, pnlPercent);
+      return;
+    }
+
+    if (pnlPercent <= -CONFIG.risk.stopLossPercent) {
+      console.log("[风控] 达到止损条件");
+      this.sell(token, proceeds, pnl, pnlPercent);
     }
   }
 
-  private sell(token: string, price: number, change: number) {
+  private sell(
+    token: string,
+    proceeds: number,
+    pnl: number,
+    pnlPercent: number
+  ): void {
     const position = this.positions.get(token);
     if (!position) return;
 
-    const sellPrice = price * (1 - CONFIG.slippagePercent / 100);
-    const proceeds = position.quantity * sellPrice;
-
     this.balance += proceeds;
+    this.realizedPnl += pnl;
     this.positions.delete(token);
 
     console.log(
-      `[模拟卖出] ${position.symbol} | 回收 ${proceeds.toFixed(6)} BNB | 盈亏 ${change.toFixed(2)}%`
+      `[模拟卖出] ${position.symbol} | 回收 ${proceeds.toFixed(6)} BNB`
+    );
+
+    console.log(
+      `[交易盈亏] ${pnl >= 0 ? "+" : ""}${pnl.toFixed(6)} BNB (${pnlPercent.toFixed(2)}%)`
     );
   }
 
-  report() {
-    console.log("\n========== 模拟账户 ==========");
+  report(): void {
+    console.log("\n========== 模拟账户报告 ==========");
     console.log(`虚拟余额：${this.balance.toFixed(6)} BNB`);
     console.log(`当前持仓：${this.positions.size}`);
-    console.log("真实交易：禁用");
-    console.log("==============================");
+    console.log(`最大持仓：${CONFIG.risk.maxPositions}`);
+    console.log(`累计已实现盈亏：${this.realizedPnl.toFixed(6)} BNB`);
+    console.log(`止盈比例：${CONFIG.risk.takeProfitPercent}%`);
+    console.log(`止损比例：${CONFIG.risk.stopLossPercent}%`);
+    console.log("真实钱包：未连接");
+    console.log("真实交易：已禁用");
+    console.log("==================================");
   }
 }
 
 function checkStrategy(signal: Signal): boolean {
   switch (signal.type) {
     case "NEW_POOL":
-      return (signal.liquidityBnb ?? 0) >= CONFIG.minLiquidityBnb;
+      return (
+        CONFIG.strategies.newPool &&
+        (signal.liquidityBnb ?? 0) >= CONFIG.filters.minLiquidityBnb
+      );
 
     case "NEW_TOKEN":
-      return true;
+      return CONFIG.strategies.newToken;
 
     case "LARGE_BUY":
-      return (signal.buyAmountBnb ?? 0) >= CONFIG.largeBuyThresholdBnb;
+      return (
+        CONFIG.strategies.largeBuy &&
+        (signal.buyAmountBnb ?? 0) >= CONFIG.filters.largeBuyThresholdBnb
+      );
 
     default:
       return false;
   }
 }
 
-async function main() {
+async function main(): Promise<void> {
   console.log("==================================");
   console.log("BSC 多策略模拟狙击系统");
   console.log("模式：SIMULATION ONLY");
@@ -139,20 +178,16 @@ async function main() {
   ];
 
   for (const signal of demoSignals) {
-    const start = Date.now();
-
     console.log(`[发现信号] ${signal.type} | ${signal.symbol}`);
 
     if (checkStrategy(signal)) {
       simulator.buy(signal, 0.00001);
     } else {
-      console.log("[策略] 未达到触发条件");
+      console.log("[策略] 未达到触发条件或策略已关闭");
     }
-
-    console.log(`[处理耗时] ${Date.now() - start} ms\n`);
   }
 
-  console.log("开始模拟价格变化...\n");
+  console.log("\n开始模拟价格变化...\n");
 
   simulator.updatePrice("DEMO001", 0.000013);
   simulator.updatePrice("DEMO002", 0.0000085);
@@ -161,4 +196,6 @@ async function main() {
   simulator.report();
 }
 
-main().catch(console.error);
+main().catch((error: unknown) => {
+  console.error("[系统错误]", error);
+});
