@@ -6,6 +6,7 @@ export interface LaunchInfo {
   pool: string;
   version: PoolVersion;
   token: string;
+  wbnbIsToken0?: boolean;
 }
 
 export const pendingLaunchSubscriptions =
