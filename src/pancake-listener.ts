@@ -152,6 +152,7 @@ const createdBlock = parseInt(log.blockNumber, 16);
   pool,
   version === "V2" ? V2_MINT : V3_MINT
 ).then((logs) => {
+    console.log("历史流动性回查结果：", logs.length, "条");
   for (const item of logs) {
     handleLiquidity(item, { pool, version, token });
   }
