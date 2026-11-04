@@ -128,8 +128,8 @@ export async function inspectToken(
       name: "管理员权限",
       status: isZero ? "无法判断" : "风险信号",
       detail: isZero
-        ? "owner() 返回零地址，未检测到普通 owner"
-        : `检测到管理员地址：${owner}`
+  ? "owner() 返回零地址，但不代表不存在其他管理权限"
+  : `检测到管理员地址：${owner}`
     });
   } else {
     results.push({
