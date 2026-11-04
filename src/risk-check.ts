@@ -126,7 +126,7 @@ export async function inspectToken(
 
     results.push({
       name: "管理员权限",
-      status: isZero ? "正常信号" : "风险信号",
+      status: isZero ? "无法判断" : "风险信号",
       detail: isZero
         ? "owner() 返回零地址，未检测到普通 owner"
         : `检测到管理员地址：${owner}`
