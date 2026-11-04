@@ -64,6 +64,7 @@ const ws = new WebSocket(BSC_WS);
 let totalPools = 0;
 let liquidityEvents = 0;
 let nextId = 10;
+const checkedTokens = new Set<string>();
 
 const pending = new Map<number, {
   pool: string;
