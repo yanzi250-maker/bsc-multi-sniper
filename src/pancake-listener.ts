@@ -8,7 +8,7 @@ import {
 } from "./launch-monitor.js";
 
 const BSC_WS = "wss://bsc-rpc.publicnode.com";
-
+const BSC_HTTP = "https://bsc-rpc.publicnode.com";
 const V2_FACTORY = "0xca143ce32fe78f1f7019d7d551a6402fc5350c73";
 const V3_FACTORY = "0x0bfbcf9fa4f9c56b0f40a671ad40e0805a091865";
 
@@ -27,6 +27,38 @@ const V3_MINT =
 const WBNB = "0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c";
 const TEST_DURATION = 60_000;
 
+async function getBlockLogs(
+  fromBlock: number,
+  toBlock: number,
+  address: string,
+  topic: string
+) {
+  const response = await fetch(BSC_HTTP, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 99,
+      method: "eth_getLogs",
+      params: [{
+        fromBlock: "0x" + fromBlock.toString(16),
+        toBlock: "0x" + toBlock.toString(16),
+        address,
+        topics: [topic]
+      }]
+    })
+  });
+
+  const result = await response.json() as any;
+
+  if (result.error) {
+    throw new Error(JSON.stringify(result.error));
+  }
+
+  return result.result || [];
+}
 const ws = new WebSocket(BSC_WS);
 
 let totalPools = 0;
@@ -113,7 +145,20 @@ function handlePool(log: any, version: "V2" | "V3") {
   console.log("代币：", token);
   console.log("池地址：", pool);
   console.log("创建区块：", parseInt(log.blockNumber, 16));
-
+const createdBlock = parseInt(log.blockNumber, 16);
+  getBlockLogs(
+  createdBlock,
+  createdBlock,
+  pool,
+  version === "V2" ? V2_MINT : V3_MINT
+).then((logs) => {
+  for (const item of logs) {
+    handleLiquidity(item, { pool, version, token });
+  }
+}).catch((error) => {
+  console.log("历史流动性回查失败：", String(error));
+});
+  
   subscribeLiquidity(pool, version, token);
   subscribeLaunchEvents(ws, nextId++, pool, version, token);
 }
