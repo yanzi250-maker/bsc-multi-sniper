@@ -74,7 +74,7 @@ function subscribeLiquidity(
   console.log("已请求订阅流动性事件：", pool);
 }
 
-function handlePool(log: any, version: string) {
+function handlePool(log: any, version: "V2" | "V3") {
   const topics = log.topics || [];
   const data = log.data || "0x";
 
@@ -115,6 +115,7 @@ function handlePool(log: any, version: string) {
   console.log("创建区块：", parseInt(log.blockNumber, 16));
 
   subscribeLiquidity(pool, version, token);
+  subscribeLaunchEvents(ws, nextId++, pool, version, token);
 }
 
 function handleLiquidity(log: any, info: any) {
