@@ -113,7 +113,7 @@ function handlePool(log: any, version: string) {
 function handleLiquidity(log: any, info: any) {
   const data = log.data || "0x";
 
-  const requiredLength = info.version === "V2" ? 130 : 194;
+  const requiredLength = info.version === "V2" ? 130 : 258;
 
   if (data.length < requiredLength) {
     console.log("流动性事件数据长度异常：", info.pool);
