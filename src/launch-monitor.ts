@@ -28,12 +28,14 @@ export function subscribeLaunchEvents(
   id: number,
   pool: string,
   version: PoolVersion,
-  token: string
+  token: string,
+  wbnbIsToken0?: boolean
 ): void {
   const info: LaunchInfo = {
     pool,
     version,
-    token
+    token,
+    wbnbIsToken0
   };
 
   pendingLaunchSubscriptions.set(id, info);
