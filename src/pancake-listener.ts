@@ -161,7 +161,14 @@ const createdBlock = parseInt(log.blockNumber, 16);
 });
   
   subscribeLiquidity(pool, version, token);
-  subscribeLaunchEvents(ws, nextId++, pool, version, token);
+  subscribeLaunchEvents(
+  ws,
+  nextId++,
+  pool,
+  version,
+  token,
+  token0.toLowerCase() === WBNB.toLowerCase()
+);
 }
 
 function handleLiquidity(log: any, info: any) {
