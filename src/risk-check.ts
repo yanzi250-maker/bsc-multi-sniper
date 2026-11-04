@@ -3,7 +3,7 @@ const BSC_RPC = "https://bsc-rpc.publicnode.com";
 
 type CheckResult = {
   name: string;
-  status: "正常信号" | "风险信号" | "无法判断";
+  status: "风险信号" | "无法判断" | "信息项";
   detail: string;
 };
 
@@ -18,6 +18,10 @@ async function rpc(method: string, params: unknown[]): Promise<any> {
       params
     })
   });
+
+  if (!response.ok) {
+    throw new Error(`RPC HTTP 错误：${response.status}`);
+  }
 
   const result = await response.json() as any;
 
@@ -44,6 +48,7 @@ async function callToken(
 
 function decodeUint(value: string | null): bigint | null {
   if (!value || value === "0x") return null;
+
   try {
     return BigInt(value);
   } catch {
@@ -62,7 +67,6 @@ function decodeString(value: string | null): string {
   try {
     const hex = value.slice(2);
 
-    // ABI 动态字符串
     if (hex.length >= 128) {
       const offset = Number(BigInt("0x" + hex.slice(0, 64))) * 2;
       const length = Number(BigInt("0x" + hex.slice(offset, offset + 64)));
@@ -75,7 +79,6 @@ function decodeString(value: string | null): string {
       }
     }
 
-    // bytes32 格式
     const bytes = hex.slice(0, 64).match(/.{2}/g) || [];
     const text = bytes
       .map(byte => parseInt(byte, 16))
@@ -108,12 +111,21 @@ export async function inspectToken(
       detail: "该地址没有检测到合约代码"
     });
 
+    console.log("\n========== 代币风险检查 ==========");
+    console.log("代币地址：", token);
+
+    for (const item of results) {
+      console.log(`[${item.status}] ${item.name}：${item.detail}`);
+    }
+
+    console.log("注意：这不是完整安全审计，不能保证可买卖。");
+    console.log("================================");
     return results;
   }
 
   results.push({
     name: "合约代码",
-    status: "正常信号",
+    status: "信息项",
     detail: `已检测到合约代码，字节长度约 ${(code.length - 2) / 2}`
   });
 
@@ -128,28 +140,28 @@ export async function inspectToken(
       name: "管理员权限",
       status: isZero ? "无法判断" : "风险信号",
       detail: isZero
-  ? "owner() 返回零地址，但不代表不存在其他管理权限"
-  : `检测到管理员地址：${owner}`
+        ? "owner() 返回零地址，但不代表不存在其他管理权限"
+        : `检测到 owner 管理权限：${owner}，需要进一步审查`
     });
   } else {
     results.push({
       name: "管理员权限",
       status: "无法判断",
-      detail: "合约未提供可读取的 owner() 信息"
+      detail: "未读取到标准 owner() 信息，不代表没有管理员权限"
     });
   }
 
-  // 3. 检查暂停状态 paused()
+  // 3. 检查暂停状态
   const pausedRaw = await callToken(token, "0x5c975abb");
   const paused = decodeUint(pausedRaw);
 
-  if (paused !== null) {
+  if (paused !== null && (paused === 0n || paused === 1n)) {
     results.push({
       name: "暂停状态",
-      status: paused === 1n ? "风险信号" : "正常信号",
+      status: paused === 1n ? "风险信号" : "信息项",
       detail: paused === 1n
-        ? "paused() 返回 true"
-        : "paused() 返回 false"
+        ? "paused() 返回 true，合约可能处于暂停状态"
+        : "paused() 返回 false，仅代表该标准接口未报告暂停"
     });
   } else {
     results.push({
@@ -170,27 +182,29 @@ export async function inspectToken(
 
   results.push({
     name: "代币名称",
-    status: nameRaw ? "正常信号" : "无法判断",
+    status: nameRaw ? "信息项" : "无法判断",
     detail: decodeString(nameRaw)
   });
 
   results.push({
     name: "代币符号",
-    status: symbolRaw ? "正常信号" : "无法判断",
+    status: symbolRaw ? "信息项" : "无法判断",
     detail: decodeString(symbolRaw)
   });
 
   const decimals = decodeUint(decimalsRaw);
+
   results.push({
     name: "精度",
-    status: decimals !== null ? "正常信号" : "无法判断",
+    status: decimals !== null ? "信息项" : "无法判断",
     detail: decimals !== null ? decimals.toString() : "无法读取"
   });
 
   const supply = decodeUint(supplyRaw);
+
   results.push({
     name: "总供应量",
-    status: supply !== null ? "正常信号" : "无法判断",
+    status: supply !== null ? "信息项" : "无法判断",
     detail: supply !== null ? supply.toString() : "无法读取"
   });
 
@@ -211,13 +225,13 @@ export async function inspectToken(
       results.push({
         name: "代理合约",
         status: "无法判断",
-        detail: `可能存在可升级代理，实现合约：${implementation}，需要进一步检查`
+        detail: `检测到 EIP-1967 实现地址：${implementation}，需要进一步审查`
       });
     } else {
       results.push({
         name: "代理合约",
         status: "无法判断",
-        detail: "未检测到 EIP-1967 标准实现地址，但不排除其他代理模式"
+        detail: "未检测到 EIP-1967 标准实现地址，不排除其他代理模式"
       });
     }
   } catch {
@@ -228,16 +242,16 @@ export async function inspectToken(
     });
   }
 
+  // 6. 输出检查报告
   console.log("\n========== 代币风险检查 ==========");
   console.log("代币地址：", token);
 
   for (const item of results) {
-    console.log(
-      `[${item.status}] ${item.name}：${item.detail}`
-    );
+    console.log(`[${item.status}] ${item.name}：${item.detail}`);
   }
 
   console.log("注意：这不是完整安全审计，不能保证可买卖。");
+  console.log("当前仅做链上只读检查，不执行交易。");
   console.log("================================");
 
   return results;
