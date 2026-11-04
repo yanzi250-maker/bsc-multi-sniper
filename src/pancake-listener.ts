@@ -140,7 +140,16 @@ function handlePool(log: any, version: "V2" | "V3") {
     token0.toLowerCase() === WBNB.toLowerCase()
       ? token1
       : token0;
+  const tokenKey = token.toLowerCase();
 
+  if (!checkedTokens.has(tokenKey)) {
+    checkedTokens.add(tokenKey);
+    console.log("\n新代币只读风险检查开始：", token);
+
+    inspectToken(token).catch((error) => {
+      console.log("代币风险检查失败：", token, String(error));
+    });
+  }
   console.log("\n发现 WBNB 新池！");
   console.log("版本：", version);
   console.log("代币：", token);
