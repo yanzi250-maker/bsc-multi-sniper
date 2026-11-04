@@ -182,6 +182,16 @@ function handleLiquidity(log: any, info: any) {
     return;
   }
 
+  const logKey =
+    `${info.pool.toLowerCase()}:${log.transactionHash}:${log.logIndex}`;
+
+  if (processedLiquidityEvents.has(logKey)) {
+    console.log("重复流动性事件，已跳过：", log.transactionHash);
+    return;
+  }
+
+  processedLiquidityEvents.add(logKey);
+
   let amount0: bigint;
   let amount1: bigint;
 
