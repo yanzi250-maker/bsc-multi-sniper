@@ -1,5 +1,5 @@
 import WebSocket from "ws";
-
+import { inspectToken } from "./risk-check.js";
 import {
   pendingLaunchSubscriptions,
   launchSubscriptions,
